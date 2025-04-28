@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drag Race Guess Who</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #fce7f3; /* pink-100 */
+        }
+        /* Styling for the queen cards */
+        .queen-card {
+            border: 1px solid #cbd5e1; /* gray-300 */
+            background-color: white;
+            padding: 0.5rem; /* p-2 */
+            border-radius: 0.375rem; /* rounded-md */
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            aspect-ratio: 1 / 1.25;
+            overflow: hidden;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            position: relative; /* Needed for potential overlays or icons */
+        }
+        .queen-card img {
+            width: 100%; height: 78%; object-fit: cover; border-radius: 0.25rem; margin-bottom: 0.25rem; background-color: #f3f4f6; display: block; /* Prevents extra space below image */
+        }
+        .queen-card .queen-name {
+            font-size: 0.7rem; line-height: 0.9rem; color: #374151; flex-grow: 1; display: flex; align-items: center; justify-content: center; width: 100%; overflow-wrap: break-word; hyphens: auto; padding: 0 0.1rem 0.1rem 0.1rem;
+        }
+        .queen-card:hover { border-color: #f472b6; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+
+        /* Eliminated State */
+        .queen-card.eliminated {
+            opacity: 0.4;
+            cursor: default;
+            /* Removed border-color override to allow highlight border to show */
+            background-color: #e5e7eb; /* gray-200 */
+        }
+        .queen-card.eliminated img { filter: grayscale(80%); }
+        .queen-card.eliminated:hover { box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+
+        /* 'My Queen' Highlight State */
+        .queen-card.my-queen-highlight {
+            border: 3px solid #fbbf24; /* amber-400 - Gold border */
+            box-shadow: 0 0 8px rgba(251, 191, 36, 0.6); /* Subtle glow */
+             padding: calc(0.5rem - 2px); /* Adjust padding to account for thicker border */
+        }
+        /* Ensure highlight border overrides hover border color */
+         .queen-card.my-queen-highlight:hover {
+             border-color: #fbbf24; /* Keep gold border on hover */
+         }
+         /* Combined state: Highlighted AND Eliminated */
+         .queen-card.my-queen-highlight.eliminated {
+             /* Styles from .eliminated (opacity, background, filter) */
+             /* Styles from .my-queen-highlight (border, box-shadow, padding) */
+             /* No conflicts expected with current styles */
+         }
+
+
+        /* Styling for filter buttons */
+        .filter-button { padding: 0.3rem 0.6rem; border: 1px solid transparent; border-radius: 0.375rem; font-size: 0.8rem; cursor: pointer; transition: all 0.2s ease-in-out; margin: 0.15rem; }
+        .filter-button.selected { background-color: #ec4899; color: white; border-color: #db2777; }
+        .filter-button:not(.selected) { background-color: #f3f4f6; color: #374151; border-color: #d1d5db; }
+        .filter-button:not(.selected):hover { background-color: #e5e7eb; }
+        .filter-group { margin-bottom: 0.75rem; padding-bottom: 0.75rem; border-bottom: 1px solid #e5e7eb; }
+        .filter-group:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+        /* Styling for difficulty radio buttons */
+        .difficulty-label { margin-left: 0.25rem; margin-right: 0.75rem; font-size: 0.875rem; }
+        .difficulty-input { accent-color: #ec4899; /* Pink */ }
+
+        /* Styling for Modal */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); padding-top: 60px; }
+        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 25px; border: 1px solid #888; width: 80%; max-width: 600px; border-radius: 0.5rem; position: relative; box-shadow: 0 5px 15px rgba(0,0,0,0.3); color: #333; }
+        .modal-content h2 { margin-top: 0; margin-bottom: 1rem; font-size: 1.5rem; color: #be185d; text-align: center; }
+        .modal-content h3 { font-weight: bold; margin-top: 1rem; margin-bottom: 0.5rem; font-size: 1.1rem; }
+        .modal-content p, .modal-content li { font-size: 0.95rem; line-height: 1.5; margin-bottom: 0.5rem; }
+        .modal-content ul { list-style-position: inside; padding-left: 0.5rem; }
+        .modal-close-btn { color: #aaa; position: absolute; top: 10px; right: 15px; font-size: 28px; font-weight: bold; cursor: pointer; line-height: 1; }
+        .modal-close-btn:hover, .modal-close-btn:focus { color: black; text-decoration: none; }
+
+        /* General button styles */
+        button { transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out; }
+        button:active { transform: scale(0.98); }
+
+        /* Copy Button Feedback Style */
+        .copy-feedback { font-size: 0.75rem; color: #16a34a; margin-left: 0.5rem; opacity: 0; transition: opacity 0.5s ease-in-out; }
+        .copy-feedback.visible { opacity: 1; }
+
+        /* Subtle button for How to Play, Reset, Copy */
+        .utility-button { background-color: #e5e7eb; color: #374151; padding: 0.3rem 0.6rem; border-radius: 0.375rem; font-size: 0.8rem; border: 1px solid #d1d5db; margin: 0 0.25rem; }
+        .utility-button:hover { background-color: #d1d5db; }
+
+        /* Toggle Button specific styles */
+        .toggle-button { font-weight: bold; padding: 0.5rem 1rem; border-radius: 0.375rem; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+
+
+    </style>
+</head>
+<body class="p-5 min-h-screen">
+
+    <h1 class="text-3xl font-bold text-center text-pink-700 mb-4">Drag Race Guess Who</h1>
+    <div class="text-center mb-6">
+         <button id="how-to-play-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-1 px-3 rounded-md text-sm shadow">
+             How to Play?
+         </button>
+    </div>
+
+    <div class="max-w-xl mx-auto bg-white p-4 rounded-lg shadow mb-6 text-center">
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Difficulty (Number of Queens):</label>
+            <div class="flex justify-center items-center">
+                <input type="radio" id="difficulty-easy" name="difficulty" value="16" class="difficulty-input">
+                <label for="difficulty-easy" class="difficulty-label">Easy (16)</label>
+                <input type="radio" id="difficulty-normal" name="difficulty" value="24" class="difficulty-input" checked>
+                <label for="difficulty-normal" class="difficulty-label">Normal (24)</label>
+                <input type="radio" id="difficulty-hard" name="difficulty" value="32" class="difficulty-input">
+                <label for="difficulty-hard" class="difficulty-label">Hard (32)</label>
+            </div>
+        </div>
+        <div class="mb-4">
+            <label for="seed-input" class="block text-sm font-medium text-gray-700 mb-1">Enter Seed to Join:</label>
+            <input type="text" id="seed-input" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500">
+        </div>
+        <div class="flex flex-wrap justify-center items-center space-x-4 mb-3">
+             <button id="join-game-btn" class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-md shadow mb-2 sm:mb-0">
+                Join with Seed
+            </button>
+            <button id="new-game-btn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-md shadow mb-2 sm:mb-0">
+                Start New Game
+            </button>
+        </div>
+         <p id="seed-display" class="mt-2 text-sm text-gray-600 inline-flex items-center">
+             Game Seed: <span class="font-mono bg-gray-200 px-2 py-1 rounded ml-2 mr-1">N/A</span>
+             <button id="copy-seed-btn" class="utility-button" title="Copy Seed">
+                 <i class="fa-regular fa-copy"></i> </button>
+             <span id="copy-feedback" class="copy-feedback">Copied!</span>
+         </p>
+         <p id="error-message" class="mt-1 text-sm text-red-600 h-4"></p>
+    </div>
+
+    <div class="max-w-2xl mx-auto bg-white p-4 rounded-lg shadow mb-6">
+         <h2 class="text-lg font-semibold text-center text-gray-800 mb-3">Filter by Season</h2>
+        <div id="filter-container">
+             <div class="filter-group">
+                 <h3 class="text-sm font-medium text-center text-gray-600 mb-2">US Main Seasons</h3>
+                 <div id="main-season-filters" class="flex flex-wrap justify-center">
+                     </div>
+             </div>
+             <div class="filter-group">
+                  <h3 class="text-sm font-medium text-center text-gray-600 mb-2">US All Stars</h3>
+                  <div id="as-season-filters" class="flex flex-wrap justify-center">
+                      </div>
+             </div>
+        </div>
+        <div class="text-center mt-3">
+             <button id="select-all-btn" class="text-xs text-blue-600 hover:underline mr-2">Select All</button>
+             <button id="deselect-all-btn" class="text-xs text-blue-600 hover:underline">Deselect All</button>
+        </div>
+    </div>
+
+    <div id="queen-grid-container" class="max-w-7xl mx-auto bg-white p-4 rounded-lg shadow">
+         <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
+             <p id="instruction-text" class="text-center sm:text-left text-gray-700 flex-grow">Select difficulty & seasons, then start or join a game.</p>
+             <div class="flex items-center flex-shrink-0">
+                 <button id="pick-queen-toggle-btn" class="toggle-button bg-yellow-500 hover:bg-yellow-600 text-white text-sm">
+                    Pick My Queen
+                 </button>
+                 <button id="reset-board-btn" class="utility-button ml-2">Reset Eliminations</button>
+             </div>
+         </div>
+        <div id="queen-grid" class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-2 md:gap-3">
+            </div>
+        <p id="queen-count-message" class="text-center text-sm text-gray-500 mt-4"></p>
+    </div>
+
+    <div id="how-to-play-modal" class="modal">
+        <div class="modal-content">
+            <span id="modal-close-btn" class="modal-close-btn">&times;</span>
+            <h2>How to Play Drag Race Guess Who!</h2>
+            </div>
+    </div>
+
+    <script>
+        // --- Data: US Drag Race Queen Data with Single Relative Image URL ---
+        const placeholderImageUrl = 'https://placehold.co/150x180/f0abfc/374151?text=?'; // Fallback placeholder
+        // Using single imageUrl with relative path. S1 uses provided names. Others are placeholders.
+        // You will need to replace placeholder filenames with your actual image files in the 'images' folder.
+        const allQueensData = [
+            // S1 Queens (Using provided filenames)
+            { name: "BeBe Zahara Benet", seasons: ["S1", "AS3"], imageUrl: "images/s1_bebe.png" },
+            { name: "Nina Flowers", seasons: ["S1", "AS1"], imageUrl: "images/s1_nina.png" },
+            { name: "Rebecca Glasscock", seasons: ["S1"], imageUrl: "images/s1_rebecca.jpeg" },
+            { name: "Shannel", seasons: ["S1", "AS1", "AS9"], imageUrl: "images/s1_shannel.jpg" },
+            { name: "Ongina", seasons: ["S1", "AS5"], imageUrl: "images/s1_ongina.jpeg" },
+            { name: "Jade Sotomayor", seasons: ["S1"], imageUrl: "images/s1_jade.webp" },
+            { name: "Akashia", seasons: ["S1"], imageUrl: "images/s1_akashia.webp" },
+            { name: "Tammie Brown", seasons: ["S1", "AS1"], imageUrl: "images/s1_tammie.jpeg" },
+            { name: "Victoria “Porkchop” Parker", seasons: ["S1"], imageUrl: "images/s1_porkchop.jpeg" },
+            // S2 Queens (Placeholders based on name/first season)
+            { name: "Tyra Sanchez", seasons: ["S2"], imageUrl: "images/s2_tyra.jpg" },
+            { name: "Raven", seasons: ["S2", "AS1"], imageUrl: "images/s2_raven.jpg" },
+            { name: "Jujubee", seasons: ["S2", "AS1", "AS5"], imageUrl: "images/s2_jujubee.jpg" },
+            { name: "Tatianna", seasons: ["S2", "AS2"], imageUrl: "images/s2_tatianna.png" },
+            { name: "Pandora Boxx", seasons: ["S2", "AS1", "AS6"], imageUrl: "images/s2_pandora.jpg" },
+            { name: "Jessica Wild", seasons: ["S2", "AS8"], imageUrl: "images/s2_jessica.jpeg" },
+            { name: "Sahara Davenport", seasons: ["S2"], imageUrl: "images/s2_sahara.jpg" },
+            { name: "Morgan McMichaels", seasons: ["S2", "AS3"], imageUrl: "images/s2_morgan.jpg" },
+            { name: "Kylie Sonique Love", seasons: ["S2", "AS6"], imageUrl: "images/s2_kylie.jpg" },
+            { name: "Mystique Summers Madison", seasons: ["S2"], imageUrl: "images/s2_mystique.webp" },
+            { name: "Nicole Paige Brooks", seasons: ["S2", "AS10"], imageUrl: "images/s2_nicole.jpeg" },
+            { name: "Shangela", seasons: ["S2", "S3", "AS3"], imageUrl: "images/s2_shangela.png" }, // Using S2 as first season for filename convention
+            // S3 Queens
+            { name: "Raja", seasons: ["S3", "AS7"], imageUrl: "images/s3_raja.jpg" },
+            { name: "Manila Luzon", seasons: ["S3", "AS1", "AS4"], imageUrl: "images/s3_manila.jpg" },
+            { name: "Alexis Mateo", seasons: ["S3", "AS1", "AS5"], imageUrl: "images/s3_alexis.jpg" },
+            { name: "Yara Sofia", seasons: ["S3", "AS1", "AS6"], imageUrl: "images/s3_yara.jpg" },
+            { name: "Carmen Carrera", seasons: ["S3"], imageUrl: "images/s3_carmen.jpg" },
+            { name: "Delta Work", seasons: ["S3"], imageUrl: "images/s3_delta.jpg" },
+            { name: "Stacy Layne Matthews", seasons: ["S3"], imageUrl: "images/s3_stacy.jpg" },
+            { name: "Mariah Paris Balenciaga", seasons: ["S3", "AS5"], imageUrl: "images/s3_mariah.jpg" },
+            { name: "India Ferrah", seasons: ["S3", "AS5"], imageUrl: "images/s3_india.jpg" },
+            { name: "Mimi Imfurst", seasons: ["S3", "AS1"], imageUrl: "images/s3_mimi.jpeg" },
+            { name: "Phoenix", seasons: ["S3", "AS10"], imageUrl: "images/s3_phoenix.jpg" },
+            { name: "Venus D-Lite", seasons: ["S3"], imageUrl: "images/s3_venus.jpg" },
+            // S4 Queens
+            { name: "Sharon Needles", seasons: ["S4"], imageUrl: "images/s4_sharon.jpg" },
+            { name: "Chad Michaels", seasons: ["S4", "AS1"], imageUrl: "images/s4_chad.jpeg" },
+            { name: "Phi Phi O’Hara", seasons: ["S4", "AS2"], imageUrl: "images/s4_phiphi.jpeg" },
+            { name: "Latrice Royale", seasons: ["S4", "AS1", "AS4"], imageUrl: "images/s4_latrice.jpg" },
+            { name: "Kenya Michaels", seasons: ["S4"], imageUrl: "images/s4_kenya.jpeg" },
+            { name: "DiDa Ritz", seasons: ["S4"], imageUrl: "images/s4_dida.jpeg" },
+            { name: "Willam", seasons: ["S4"], imageUrl: "images/s4_willam.jpg" },
+            { name: "Jiggly Caliente", seasons: ["S4", "AS6"], imageUrl: "images/s4_jiggly.jpg" },
+            { name: "Milan", seasons: ["S4"], imageUrl: "images/s4_milan.jpg" },
+            { name: "Madam LaQueer", seasons: ["S4"], imageUrl: "images/s4_madam.jpeg" },
+            { name: "The Princess", seasons: ["S4"], imageUrl: "images/s4_princess.jpg" },
+            { name: "Lashauwn Beyond", seasons: ["S4"], imageUrl: "images/s4_lashauwn.jpg" },
+            { name: "Alisa Summers", seasons: ["S4"], imageUrl: "images/s4_alisa.jpg" },
+            // S5 Queens
+            { name: "Jinkx Monsoon", seasons: ["S5", "AS7"], imageUrl: "images/s5_jinkx.jpg" },
+            { name: "Alaska", seasons: ["S5", "AS2"], imageUrl: "images/s5_alaska.jpg" },
+            { name: "Roxxxy Andrews", seasons: ["S5", "AS2", "AS9"], imageUrl: "images/s5_roxxxy.jpeg" },
+            { name: "Detox", seasons: ["S5", "AS2"], imageUrl: "images/s5_detox.jpeg" },
+            { name: "Coco Montrese", seasons: ["S5", "AS2"], imageUrl: "images/s5_coco.jpg" },
+            { name: "Alyssa Edwards", seasons: ["S5", "AS2"], imageUrl: "images/s5_alyssa.jpg" },
+            { name: "Ivy Winters", seasons: ["S5"], imageUrl: "images/s5_ivy.jpg" },
+            { name: "Jade Jolie", seasons: ["S5"], imageUrl: "images/s5_jade.jpg" },
+            { name: "Lineysha Sparx", seasons: ["S5"], imageUrl: "images/s5_lineysha.jpeg" },
+            { name: "Honey Mahogany", seasons: ["S5"], imageUrl: "images/s5_honey.jpg" },
+            { name: "Vivienne Pinay", seasons: ["S5"], imageUrl: "images/s5_vivienne.jpg" },
+            { name: "Monica Beverly Hillz", seasons: ["S5", "AS8"], imageUrl: "images/s5_monica.jpg" },
+            { name: "Serena ChaCha", seasons: ["S5", "AS6"], imageUrl: "images/s5_serena.jpg" },
+            { name: "Penny Tration", seasons: ["S5"], imageUrl: "images/s5_penny.jpg" },
+            // S6 Queens
+            { name: "Bianca Del Rio", seasons: ["S6"], imageUrl: "images/s6_bianca.jpeg" },
+            { name: "Adore Delano", seasons: ["S6", "AS2"], imageUrl: "images/s6_adore.jpg" },
+            { name: "Courtney Act", seasons: ["S6"], imageUrl: "images/s6_courtney.jpg" },
+            { name: "Darienne Lake", seasons: ["S6", "AS8"], imageUrl: "images/s6_darienne.jpeg" },
+            { name: "BenDeLaCreme", seasons: ["S6", "AS3"], imageUrl: "images/s6_bendela.jpg" },
+            { name: "Joslyn Fox", seasons: ["S6"], imageUrl: "images/s6_joslyn.jpg" },
+            { name: "Trinity K. Bonet", seasons: ["S6", "AS6"], imageUrl: "images/s6_trinity.jpg" },
+            { name: "Laganja Estranja", seasons: ["S6"], imageUrl: "images/s6_laganja.jpg" }, // Corrected: No AS6
+            { name: "Milk", seasons: ["S6", "AS3"], imageUrl: "images/s6_milk.jpg" },
+            { name: "Gia Gunn", seasons: ["S6", "AS4"], imageUrl: "images/s6_gia.jpg" },
+            { name: "April Carrión", seasons: ["S6"], imageUrl: "images/s6_april.jpg" },
+            { name: "Vivacious", seasons: ["S6"], imageUrl: "images/s6_vivacious.png" },
+            { name: "Kelly Mantle", seasons: ["S6"], imageUrl: "images/s6_kelly.jpg" },
+            { name: "Magnolia Crawford", seasons: ["S6"], imageUrl: "images/s6_magnolia.jpg" },
+            // S7 Queens
+            { name: "Violet Chachki", seasons: ["S7"], imageUrl: "images/s7_violet.jpg" },
+            { name: "Ginger Minj", seasons: ["S7", "AS2", "AS6", "AS10"], imageUrl: "images/s7_ginger.jpg" },
+            { name: "Pearl", seasons: ["S7"], imageUrl: "images/s7_pearl.jpg" },
+            { name: "Kennedy Davenport", seasons: ["S7", "AS3"], imageUrl: "images/s7_kennedy.jpg" },
+            { name: "Katya", seasons: ["S7", "AS2"], imageUrl: "images/s7_katya.jpg" },
+            { name: "Trixie Mattel", seasons: ["S7", "AS3"], imageUrl: "images/s7_trixie.jpg" },
+            { name: "Miss Fame", seasons: ["S7"], imageUrl: "images/s7_fame.jpg" },
+            { name: "Jaidynn Diore Fierce", seasons: ["S7"], imageUrl: "images/s7_jaidynn.jpg" },
+            { name: "Max", seasons: ["S7"], imageUrl: "images/s7_max.png" },
+            { name: "Kandy Ho", seasons: ["S7"], imageUrl: "images/s7_kandy.jpg" },
+            { name: "Mrs. Kasha Davis", seasons: ["S7", "AS8"], imageUrl: "images/s7_kasha.jpg" },
+            { name: "Jasmine Masters", seasons: ["S7", "AS4"], imageUrl: "images/s7_jasmine.jpg" },
+            { name: "Sasha Belle", seasons: ["S7"], imageUrl: "images/s7_sasha.jpg" },
+            { name: "Tempest DuJour", seasons: ["S7"], imageUrl: "images/s7_tempest.jpg" },
+            // S8 Queens
+            { name: "Bob the Drag Queen", seasons: ["S8"], imageUrl: "images/s8_bob.jpg" },
+            { name: "Kim Chi", seasons: ["S8"], imageUrl: "images/s8_kimchi.jpg" },
+            { name: "Naomi Smalls", seasons: ["S8", "AS4"], imageUrl: "images/s8_naomi.jpg" },
+            { name: "Chi Chi DeVayne", seasons: ["S8", "AS3"], imageUrl: "images/s8_chichi.jpg" },
+            { name: "Derrick Barry", seasons: ["S8", "AS5"], imageUrl: "images/s8_derrick.jpg" },
+            { name: "Thorgy Thor", seasons: ["S8", "AS3"], imageUrl: "images/s8_thorgy.png" },
+            { name: "Robbie Turner", seasons: ["S8"], imageUrl: "images/s8_robbie.jpg" },
+            { name: "Acid Betty", seasons: ["S8", "AS10"], imageUrl: "images/s8_acid.jpg" },
+            { name: "Naysha Lopez", seasons: ["S8", "AS8"], imageUrl: "images/s8_naysha.jpg" },
+            { name: "Cynthia Lee Fontaine", seasons: ["S8", "S9", "AS10"], imageUrl: "images/s8_cynthia.jpg" },
+            { name: "Dax ExclamationPoint", seasons: ["S8"], imageUrl: "images/s8_dax.jpg" },
+            { name: "Laila McQueen", seasons: ["S8"], imageUrl: "images/s8_laila.jpg" },
+            // S9 Queens
+            { name: "Sasha Velour", seasons: ["S9"], imageUrl: "images/s9_sasha.jpeg" },
+            { name: "Peppermint", seasons: ["S9"], imageUrl: "images/s9_peppermint.jpg" },
+            { name: "Shea Couleé", seasons: ["S9", "AS5", "AS7"], imageUrl: "images/s9_shea.jpg" },
+            { name: "Trinity the Tuck", seasons: ["S9", "AS4", "AS7"], imageUrl: "images/s9_trinity.jpg" },
+            { name: "Alexis Michelle", seasons: ["S9", "AS8"], imageUrl: "images/s9_alexis.jpg" },
+            { name: "Nina Bo’nina Brown", seasons: ["S9"], imageUrl: "images/s9_nina.jpg" },
+            { name: "Valentina", seasons: ["S9", "AS4"], imageUrl: "images/s9_valentina.jpg" },
+            { name: "Farrah Moan", seasons: ["S9", "AS4"], imageUrl: "images/s9_farrah.jpg" },
+            { name: "Aja", seasons: ["S9", "AS3", "AS10"], imageUrl: "images/s9_aja.jpg" },
+            { name: "Eureka", seasons: ["S9", "S10", "AS6"], imageUrl: "images/s9_eureka.jpg" },
+            { name: "Charlie Hides", seasons: ["S9"], imageUrl: "images/s9_charlie.jpg" },
+            { name: "Kimora Blac", seasons: ["S9"], imageUrl: "images/s9_kimora.jpg" },
+            { name: "Jaymes Mansfield", seasons: ["S9", "AS8"], imageUrl: "images/s9_jaymes.jpg" },
+            // S10 Queens
+            { name: "Aquaria", seasons: ["S10"], imageUrl: "images/s10_aquaria.jpg" },
+            { name: "Kameron Michaels", seasons: ["S10"], imageUrl: "images/s10_kameron.jpg" }, // Corrected: No AS6
+            { name: "Asia O’Hara", seasons: ["S10"], imageUrl: "images/s10_asia.jpg" },
+            { name: "Miz Cracker", seasons: ["S10", "AS5"], imageUrl: "images/s10_cracker.jpeg" },
+            { name: "Monét X Change", seasons: ["S10", "AS4", "AS7"], imageUrl: "images/s10_monet.jpg" },
+            { name: "The Vixen", seasons: ["S10"], imageUrl: "images/s10_vixen.jpg" },
+            { name: "Monique Heart", seasons: ["S10", "AS4"], imageUrl: "images/s10_mo.jpg" },
+            { name: "Blair St. Clair", seasons: ["S10", "AS5"], imageUrl: "images/s10_blair.jpeg" },
+            { name: "Mayhem Miller", seasons: ["S10", "AS5"], imageUrl: "images/s10_mayhem.jpeg" },
+            { name: "Dusty Ray Bottoms", seasons: ["S10"], imageUrl: "images/s10_dusty.jpeg" },
+            { name: "Yuhua Hamasaki", seasons: ["S10"], imageUrl: "images/s10_yuhua.jpg" },
+            { name: "Kalorie Karbdashian-Williams", seasons: ["S10"], imageUrl: "images/s10_kalorie.jpg" },
+            { name: "Vanessa Vanjie Mateo", seasons: ["S10", "S11", "AS9"], imageUrl: "images/s10_vanjie.jpg" },
+            // S11 Queens
+            { name: "Yvie Oddly", seasons: ["S11", "AS7"], imageUrl: "images/s11_yvie.jpg" },
+            { name: "Brooke Lynn Hytes", seasons: ["S11"], imageUrl: "images/s11_brooke.jpg" },
+            { name: "A’keria C. Davenport", seasons: ["S11", "AS6"], imageUrl: "images/s11_akeria.jpg" },
+            { name: "Silky Nutmeg Ganache", seasons: ["S11", "AS6"], imageUrl: "images/s11_silky.jpg" },
+            { name: "Nina West", seasons: ["S11", "AS9"], imageUrl: "images/s11_nina.jpg" },
+            { name: "Shuga Cain", seasons: ["S11"], imageUrl: "images/s11_shuga.jpg" },
+            { name: "Plastique Tiara", seasons: ["S11", "AS9"], imageUrl: "images/s11_plastique.jpg" },
+            { name: "Ra’Jah O’Hara", seasons: ["S11", "AS6"], imageUrl: "images/s11_rajah.jpg" },
+            { name: "Scarlet Envy", seasons: ["S11", "AS6"], imageUrl: "images/s11_scarlet.jpg" },
+            { name: "Ariel Versace", seasons: ["S11"], imageUrl: "images/s11_ariel.jpg" },
+            { name: "Mercedes Iman Diamond", seasons: ["S11"], imageUrl: "images/s11_mercedes.jpg" },
+            { name: "Honey Davenport", seasons: ["S11"], imageUrl: "images/s11_honey.jpg" },
+            { name: "Kahanna Montrese", seasons: ["S11", "AS8"], imageUrl: "images/s11_kahanna.jpg" },
+            { name: "Soju", seasons: ["S11"], imageUrl: "images/s11_soju.jpg" },
+            // S12 Queens
+            { name: "Jaida Essence Hall", seasons: ["S12", "AS7"], imageUrl: "images/s12_jaida.jpg" },
+            { name: "Crystal Methyd", seasons: ["S12"], imageUrl: "images/s12_crystal.jpg" },
+            { name: "Gigi Goode", seasons: ["S12"], imageUrl: "images/s12_gigi.jpg" },
+            { name: "Sherry Pie", seasons: ["S12"], imageUrl: "images/s12_sherry.jpg" },
+            { name: "Jackie Cox", seasons: ["S12"], imageUrl: "images/s12_jackie.jpg" },
+            { name: "Heidi N Closet", seasons: ["S12", "AS8"], imageUrl: "images/s12_heidi.jpg" },
+            { name: "Widow Von’Du", seasons: ["S12"], imageUrl: "images/s12_widow.jpg" },
+            { name: "Jan Sport", seasons: ["S12", "AS6"], imageUrl: "images/s12_jan.jpg" },
+            { name: "Brita Filter", seasons: ["S12"], imageUrl: "images/s12_brita.jpg" },
+            { name: "Aiden Zhane", seasons: ["S12"], imageUrl: "images/s12_aiden.jpg" },
+            { name: "Nicky Doll", seasons: ["S12"], imageUrl: "images/s12_nicky.jpg" },
+            { name: "Rock M. Sakura", seasons: ["S12"], imageUrl: "images/s12_rock.jpg" },
+            { name: "Dahlia Sin", seasons: ["S12"], imageUrl: "images/s12_dahlia.jpg" },
+            // S13 Queens
+            { name: "Symone", seasons: ["S13"], imageUrl: "images/s13_symone.jpg" },
+            { name: "Kandy Muse", seasons: ["S13", "AS8"], imageUrl: "images/s13_kandy.jpg" },
+            { name: "Gottmik", seasons: ["S13", "AS9"], imageUrl: "images/s13_gottmik.jpg" },
+            { name: "Rosé", seasons: ["S13"], imageUrl: "images/s13_rose.jpg" },
+            { name: "Olivia Lux", seasons: ["S13", "AS10"], imageUrl: "images/s13_olivia.jpg" },
+            { name: "Utica Queen", seasons: ["S13"], imageUrl: "images/s13_utica.jpg" },
+            { name: "Tina Burner", seasons: ["S13", "AS10"], imageUrl: "images/s13_tina.jpg" },
+            { name: "Denali", seasons: ["S13", "AS10"], imageUrl: "images/s13_denali.jpg" },
+            { name: "Elliott with 2 Ts", seasons: ["S13"], imageUrl: "images/s13_elliott.jpg" },
+            { name: "LaLa Ri", seasons: ["S13", "AS8"], imageUrl: "images/s13_lala.jpg" },
+            { name: "Tamisha Iman", seasons: ["S13"], imageUrl: "images/s13_tamisha.jpg" },
+            { name: "Joey Jay", seasons: ["S13"], imageUrl: "images/s13_joey.jpg" },
+            { name: "Kahmora Hall", seasons: ["S13"], imageUrl: "images/s13_kahmora.jpg" },
+            // S14 Queens
+            { name: "Willow Pill", seasons: ["S14"], imageUrl: "images/s14_willow.jpg" },
+            { name: "Lady Camden", seasons: ["S14"], imageUrl: "images/s14_camden.jpg" },
+            { name: "Angeria Paris VanMichaels", seasons: ["S14", "AS9"], imageUrl: "images/s14_angeria.jpg" },
+            { name: "Bosco", seasons: ["S14", "AS10"], imageUrl: "images/s14_bosco.jpg" },
+            { name: "Daya Betty", seasons: ["S14", "AS10"], imageUrl: "images/s14_daya.jpg" },
+            { name: "Deja Skye", seasons: ["S14", "AS10"], imageUrl: "images/s14_deja.jpg" },
+            { name: "Jorgeous", seasons: ["S14", "AS9", "AS10"], imageUrl: "images/s14_jorgeous.jpg" },
+            { name: "Jasmine Kennedie", seasons: ["S14"], imageUrl: "images/s14_jasmine.jpg" },
+            { name: "Kerri Colby", seasons: ["S14", "AS10"], imageUrl: "images/s14_kerri.jpg" },
+            { name: "Maddy Morphosis", seasons: ["S14"], imageUrl: "images/s14_maddy.jpg" },
+            { name: "Orion Story", seasons: ["S14"], imageUrl: "images/s14_orion.jpg" },
+            { name: "Kornbread", seasons: ["S14"], imageUrl: "images/s14_kornbread.jpg" },
+            { name: "Alyssa Hunter", seasons: ["S14", "AS10"], imageUrl: "images/s14_alyssa.jpg" },
+            { name: "June Jambalaya", seasons: ["S14"], imageUrl: "images/s14_june.jpg" },
+            // S15 Queens
+            { name: "Sasha Colby", seasons: ["S15"], imageUrl: "images/s15_sasha.jpg" },
+            { name: "Anetra", seasons: ["S15"], imageUrl: "images/s15_anetra.jpg" },
+            { name: "Luxx Noir London", seasons: ["S15"], imageUrl: "images/s15_luxx.jpg" },
+            { name: "Mistress Isabelle Brooks", seasons: ["S15", "AS10"], imageUrl: "images/s15_mistress.jpg" },
+            { name: "Loosey LaDuca", seasons: ["S15"], imageUrl: "images/s15_loosey.jpg" },
+            { name: "Salina EsTitties", seasons: ["S15"], imageUrl: "images/s15_salina.jpg" },
+            { name: "Marcia Marcia Marcia", seasons: ["S15"], imageUrl: "images/s15_marcia.jpg" },
+            { name: "Malaysia Babydoll Fox", seasons: ["S15"], imageUrl: "images/s15_malaysia.jpg" },
+            { name: "Spice", seasons: ["S15"], imageUrl: "images/s15_spice.jpg" },
+            { name: "Jax", seasons: ["S15"], imageUrl: "images/s15_jax.jpg" },
+            { name: "Aura Mayari", seasons: ["S15"], imageUrl: "images/s15_aura.jpg" },
+            { name: "Robin Fierce", seasons: ["S15"], imageUrl: "images/s15_robin.jpg" },
+            { name: "Amethyst", seasons: ["S15"], imageUrl: "images/s15_amethyst.jpg" },
+            { name: "Sugar", seasons: ["S15"], imageUrl: "images/s15_sugar.jpg" },
+            { name: "Princess Poppy", seasons: ["S15"], imageUrl: "images/s15_princess.jpg" },
+            { name: "Irene the Alien", seasons: ["S15", "AS10"], imageUrl: "images/s15_irene.jpg" },
+            // S16 Queens
+            { name: "Nymphia Wind", seasons: ["S16"], imageUrl: "images/s16_nymphia.jpg" },
+            { name: "Sapphira Cristál", seasons: ["S16"], imageUrl: "images/s16_sapphira.jpg" },
+            { name: "Plane Jane", seasons: ["S16"], imageUrl: "images/s16_plane.jpg" },
+            { name: "Q", seasons: ["S16"], imageUrl: "images/s16_q.jpg" },
+            { name: "Morphine Love Dion", seasons: ["S16"], imageUrl: "images/s16_morphine.jpg" },
+            { name: "Dawn", seasons: ["S16"], imageUrl: "images/s16_dawn.jpg" },
+            { name: "Mhi’ya Iman Le’Paige", seasons: ["S16"], imageUrl: "images/s16_mhiya.jpg" },
+            { name: "Plasma", seasons: ["S16"], imageUrl: "images/s16_plasma.jpg" },
+            { name: "Xunami Muse", seasons: ["S16"], imageUrl: "images/s16_xunami.jpg" },
+            { name: "Megami", seasons: ["S16"], imageUrl: "images/s16_megami.jpg" },
+            { name: "Geneva Karr", seasons: ["S16"], imageUrl: "images/s16_geneva.jpg" },
+            { name: "Amanda Tori Meating", seasons: ["S16"], imageUrl: "images/s16_amanda.jpg" },
+            { name: "Mirage", seasons: ["S16"], imageUrl: "images/s16_mirage.jpg" },
+            { name: "Hershii LiqCour-Jeté", seasons: ["S16"], imageUrl: "images/s16_hershii.jpg" },
+            // S17 Queens
+            { name: "Onya Nurve", seasons: ["S17"], imageUrl: "images/s17_onya.jpg" },
+            { name: "Jewels Sparkles", seasons: ["S17"], imageUrl: "images/s17_jewels.jpg" },
+            { name: "Lexi Love", seasons: ["S17"], imageUrl: "images/s17_lexi.jpg" },
+            { name: "Sam Star", seasons: ["S17"], imageUrl: "images/s17_sam.jpg" },
+            { name: "Suzie Toot", seasons: ["S17"], imageUrl: "images/s17_suzie.jpg" },
+            { name: "Lana Ja’Rae", seasons: ["S17"], imageUrl: "images/s17_lana.jpg" },
+            { name: "Lydia B Kollins", seasons: ["S17", "AS10"], imageUrl: "images/s17_lydia.jpg" },
+            { name: "Arrietty", seasons: ["S17"], imageUrl: "images/s17_arrietty.jpg" },
+            { name: "Kori King", seasons: ["S17"], imageUrl: "images/s17_kori.jpg" },
+            { name: "Acacia Forgot", seasons: ["S17"], imageUrl: "images/s17_acacia.jpg" },
+            { name: "Crystal Envy", seasons: ["S17"], imageUrl: "images/s17_crystal.jpg" },
+            { name: "Hormona Lisa", seasons: ["S17"], imageUrl: "images/s17_hormona.jpg" },
+            { name: "Joella", seasons: ["S17"], imageUrl: "images/s17_joella.jpg" },
+            { name: "Lucky Starzzz", seasons: ["S17"], imageUrl: "images/s17_lucky.jpg" },
+            // Non-US queens from US All Stars
+            { name: "The Vivienne", seasons: ["AS7"], imageUrl: "images/as7_vivienne.jpg" },
+            { name: "Jimbo", seasons: ["AS8"], imageUrl: "images/as8_jimbo.jpg" },
+        ];
+        const totalSeasons = 17;
+        const totalAllStarsSeasons = 10;
+        // seasonOrder is no longer needed for image selection
+
+        // --- Core Logic ---
+        let currentSeed = null; // Store the seed for the current game board
+        let currentMode = 'eliminate'; // 'eliminate' or 'pick'
+        let mySecretQueenName = null; // Stores the name of the player's chosen queen
+
+        // (PRNG, Seed, Shuffle functions remain the same)
+         /** Simple PRNG */
+        function createSeededRandom(seed) { return function() { seed |= 0; seed = (seed + 0x6D2B79F5) | 0; var t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; } }
+        /** String seed to numeric */
+        function stringToNumericSeed(strSeed) { if (!strSeed) return Math.floor(Math.random() * 1000000); let numSeed = 0; for (let i = 0; i < strSeed.length; i++) { numSeed = (numSeed + strSeed.charCodeAt(i) * (i + 1)) % 2147483647; } return numSeed; }
+        /** Seeded shuffle */
+        function shuffleArrayWithSeed(array, randomFunc) { for (let i = array.length - 1; i > 0; i--) { const j = Math.floor(randomFunc() * (i + 1)); [array[i], array[j]] = [array[j], array[i]]; } }
+        /** Generate random seed string */
+        function generateRandomSeed() { const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'; let seed = ''; for (let i = 0; i < 6; i++) { seed += chars.charAt(Math.floor(Math.random() * chars.length)); } return seed; }
+        /** Get selected season IDs */
+        function getSelectedSeasons() { const selectedSeasons = []; const filterButtons = document.querySelectorAll('#main-season-filters .filter-button.selected, #as-season-filters .filter-button.selected'); filterButtons.forEach(button => { selectedSeasons.push(button.dataset.season); }); return selectedSeasons; }
+
+        /** Filters the master queen list based on selected seasons. Returns unique queen data objects. */
+        function filterQueensBySeason(selectedSeasons) {
+            const eligibleQueenMap = new Map();
+            if (selectedSeasons.length === 0) return [];
+
+            // Corrected AS6 data for Kameron and Laganja before filtering
+             const correctedData = allQueensData.map(queen => {
+                 // Ensure seasons array exists before filtering
+                 const seasons = queen.seasons || [];
+                 if ((queen.name === "Kameron Michaels" || queen.name === "Laganja Estranja") && seasons.includes('AS6')) {
+                     // Filter out 'AS6' if it exists in their seasons list
+                     const filteredSeasons = seasons.filter(s => s !== 'AS6');
+                     // Return a new object with the corrected seasons list
+                     return { ...queen, seasons: filteredSeasons };
+                 }
+                 return queen; // Return unchanged object for other queens
+             });
+
+
+            correctedData.forEach(queen => {
+                 // Ensure seasons array exists before checking eligibility
+                 const seasons = queen.seasons || [];
+                const isEligible = seasons.some(queenSeason => selectedSeasons.includes(queenSeason));
+                 if (isEligible && !eligibleQueenMap.has(queen.name)) {
+                    eligibleQueenMap.set(queen.name, queen);
+                }
+            });
+            return Array.from(eligibleQueenMap.values());
+        }
+
+        // getApplicableImageUrl function is REMOVED as we now use a single imageUrl
+
+        /** Gets the selected difficulty (number of queens). */
+        function getSelectedDifficulty() {
+            const selectedRadio = document.querySelector('input[name="difficulty"]:checked');
+            return selectedRadio ? parseInt(selectedRadio.value, 10) : 24;
+        }
+
+        /** Resets the board by removing eliminated and highlight classes. */
+        function resetBoard() {
+            const cards = document.querySelectorAll('#queen-grid .queen-card');
+            cards.forEach(card => {
+                card.classList.remove('eliminated', 'my-queen-highlight');
+            });
+            mySecretQueenName = null; // Clear selected queen name
+            // Reset mode to eliminate and update button text
+            currentMode = 'eliminate';
+            const toggleButton = document.getElementById('pick-queen-toggle-btn');
+            if(toggleButton) {
+                toggleButton.textContent = 'Pick My Queen';
+                toggleButton.classList.remove('bg-blue-500', 'hover:bg-blue-600');
+                toggleButton.classList.add('bg-yellow-500', 'hover:bg-yellow-600');
+            }
+            console.log('Board eliminations and selection reset.');
+        }
+
+        /** Copies the current game seed to the clipboard. */
+        function copySeedToClipboard() {
+            const seedSpan = document.querySelector('#seed-display span');
+            const feedbackSpan = document.getElementById('copy-feedback');
+            if (seedSpan && seedSpan.textContent && seedSpan.textContent !== 'N/A') {
+                navigator.clipboard.writeText(seedSpan.textContent).then(() => {
+                    if (feedbackSpan) {
+                        feedbackSpan.classList.add('visible');
+                        setTimeout(() => { feedbackSpan.classList.remove('visible'); }, 1500);
+                    }
+                    console.log('Seed copied to clipboard:', seedSpan.textContent);
+                }).catch(err => { console.error('Failed to copy seed: ', err); });
+            } else { console.warn('No seed available to copy.'); }
+        }
+
+        /** Toggles between 'eliminate' and 'pick' modes. */
+        function togglePickQueenMode() {
+            const toggleButton = document.getElementById('pick-queen-toggle-btn');
+            if (!toggleButton) return; // Safety check
+
+            if (currentMode === 'eliminate') {
+                currentMode = 'pick';
+                toggleButton.textContent = 'Eliminate Queens';
+                toggleButton.classList.remove('bg-yellow-500', 'hover:bg-yellow-600');
+                toggleButton.classList.add('bg-blue-500', 'hover:bg-blue-600');
+                console.log('Mode changed to: Pick My Queen');
+            } else {
+                currentMode = 'eliminate';
+                toggleButton.textContent = 'Pick My Queen';
+                toggleButton.classList.remove('bg-blue-500', 'hover:bg-blue-600');
+                toggleButton.classList.add('bg-yellow-500', 'hover:bg-yellow-600');
+                console.log('Mode changed to: Eliminate Queens');
+            }
+        }
+
+        /** Sets up the game board with queens based on seed, filters, and difficulty. */
+        function setupBoard(seed) {
+            currentSeed = seed;
+            const gridElement = document.getElementById('queen-grid');
+            const seedDisplaySpan = document.querySelector('#seed-display span');
+            const instructionText = document.getElementById('instruction-text');
+            const errorMessage = document.getElementById('error-message');
+            const queenCountMessage = document.getElementById('queen-count-message');
+            const pickQueenBtn = document.getElementById('pick-queen-toggle-btn');
+
+            if (!gridElement || !seedDisplaySpan || !instructionText || !errorMessage || !queenCountMessage || !pickQueenBtn) { console.error("Required UI elements not found."); return; }
+
+            gridElement.innerHTML = ''; errorMessage.textContent = ''; queenCountMessage.textContent = '';
+            mySecretQueenName = null; // Reset secret queen on new board
+            currentMode = 'eliminate'; // Reset mode to eliminate
+            pickQueenBtn.textContent = 'Pick My Queen'; // Reset button text
+            pickQueenBtn.classList.remove('bg-blue-500', 'hover:bg-blue-600');
+            pickQueenBtn.classList.add('bg-yellow-500', 'hover:bg-yellow-600');
+
+            const selectedSeasons = getSelectedSeasons();
+            if (selectedSeasons.length === 0) { instructionText.textContent = 'Please select at least one season!'; seedDisplaySpan.textContent = 'N/A'; errorMessage.textContent = 'No seasons selected.'; return; }
+
+            const eligibleQueens = filterQueensBySeason(selectedSeasons); // Filtering now happens inside this function including AS6 correction
+            if (eligibleQueens.length === 0) { instructionText.textContent = 'No queens found for the selected seasons.'; seedDisplaySpan.textContent = seed; queenCountMessage.textContent = '0 queens available.'; return; }
+
+            instructionText.textContent = 'Board ready! Click "Pick My Queen" to select yours, or start eliminating!';
+            seedDisplaySpan.textContent = seed;
+
+            const numericSeed = stringToNumericSeed(seed);
+            const seededRandomFunc = createSeededRandom(numericSeed);
+            const queensToShuffle = [...eligibleQueens];
+            shuffleArrayWithSeed(queensToShuffle, seededRandomFunc);
+
+            const numberOfQueens = getSelectedDifficulty();
+            const selectedQueensData = queensToShuffle.slice(0, numberOfQueens);
+
+            queenCountMessage.textContent = `Displaying ${selectedQueensData.length} of ${eligibleQueens.length} eligible queens.`;
+             if (eligibleQueens.length < numberOfQueens) { queenCountMessage.textContent += ` (Fewer than ${numberOfQueens} available)`; }
+
+            // Generate Cards with SINGLE Image URL
+            selectedQueensData.forEach(queenData => {
+                const card = document.createElement('div'); card.classList.add('queen-card'); card.dataset.queenName = queenData.name;
+                const img = document.createElement('img'); img.alt = queenData.name;
+                // *** Use the single imageUrl property ***
+                img.src = queenData.imageUrl || placeholderImageUrl;
+                img.onerror = function() { console.warn(`Failed to load image for ${queenData.name} at ${this.src}. Using placeholder.`); this.src = placeholderImageUrl; this.onerror = null; };
+                const nameSpan = document.createElement('span'); nameSpan.classList.add('queen-name'); nameSpan.textContent = queenData.name;
+                card.appendChild(img); card.appendChild(nameSpan); gridElement.appendChild(card);
+            });
+        }
+
+        /** Handles clicks on the queen grid based on the current mode. */
+        function handleGridClick(event) {
+            const clickedCard = event.target.closest('.queen-card');
+            if (!clickedCard) return;
+
+            const queenName = clickedCard.dataset.queenName;
+
+            if (currentMode === 'eliminate') {
+                // Allow toggling 'eliminated' regardless of highlight state
+                clickedCard.classList.toggle('eliminated');
+            } else if (currentMode === 'pick') {
+                 const currentlySelected = document.querySelector('.queen-card.my-queen-highlight');
+                 // If clicking the *same* highlighted card, deselect it
+                 if (currentlySelected === clickedCard) {
+                     clickedCard.classList.remove('my-queen-highlight');
+                     mySecretQueenName = null;
+                     console.log(`Deselected secret queen.`);
+                 } else {
+                     // Remove highlight from previously selected card (if any)
+                     if (currentlySelected) {
+                         currentlySelected.classList.remove('my-queen-highlight');
+                     }
+                     // Add highlight to the newly clicked card and store the name
+                     clickedCard.classList.add('my-queen-highlight');
+                     mySecretQueenName = queenName;
+                     console.log(`Selected "${mySecretQueenName}" as secret queen.`);
+                 }
+                 // Do NOT toggle 'eliminated' class in pick mode
+            }
+        }
+
+        /** Handles clicks on the filter buttons. */
+        function handleFilterClick(event) { const clickedButton = event.target.closest('.filter-button'); if (clickedButton) { clickedButton.classList.toggle('selected'); } }
+        /** Selects or deselects all filter buttons. */
+        function setAllFilters(select) { const filterButtons = document.querySelectorAll('#main-season-filters .filter-button, #as-season-filters .filter-button'); filterButtons.forEach(button => { if (select) { button.classList.add('selected'); } else { button.classList.remove('selected'); } }); }
+        /** Generates the season filter buttons (Main & All Stars). */
+        function generateFilterButtons() {
+            const mainFilterContainer = document.getElementById('main-season-filters'); const asFilterContainer = document.getElementById('as-season-filters'); if (!mainFilterContainer || !asFilterContainer) return; mainFilterContainer.innerHTML = ''; asFilterContainer.innerHTML = '';
+            for (let i = 1; i <= totalSeasons; i++) { const button = document.createElement('button'); const seasonId = `S${i}`; button.classList.add('filter-button', 'selected'); button.textContent = `S${i}`; button.dataset.season = seasonId; mainFilterContainer.appendChild(button); }
+            for (let i = 1; i <= totalAllStarsSeasons; i++) { const button = document.createElement('button'); const seasonId = `AS${i}`; button.classList.add('filter-button', 'selected'); button.textContent = `AS${i}`; button.dataset.season = seasonId; asFilterContainer.appendChild(button); }
+        }
+
+        /** Opens the How to Play modal */
+        function openModal() { const modal = document.getElementById('how-to-play-modal'); if (modal) { populateModalContent(); modal.style.display = "block"; } }
+        /** Closes the How to Play modal */
+        function closeModal() { const modal = document.getElementById('how-to-play-modal'); if (modal) { modal.style.display = "none"; } }
+
+        /** Populates the modal with instruction text */
+        function populateModalContent() {
+             const modalContent = document.querySelector('#how-to-play-modal .modal-content');
+             if (!modalContent) return;
+
+             const closeBtn = modalContent.querySelector('.modal-close-btn');
+             modalContent.innerHTML = '';
+             if (closeBtn) modalContent.appendChild(closeBtn); // Re-add close button if it exists
+
+             const title = document.createElement('h2');
+             title.textContent = 'How to Play Drag Race Guess Who!';
+             modalContent.appendChild(title);
+
+             // Updated instruction text with corrected bolding and wording
+             modalContent.innerHTML += `
+                <h3><strong>Objective:</strong></h3>
+                <p>Be the first player to guess the mystery queen selected by your opponent.</p>
+
+                <h3><strong>Setup:</strong></h3>
+                <ul>
+                    <li><strong>(Optional) Filter Seasons:</strong> Click the "S#" and "AS#" buttons to include only the seasons you and your opponent want to play with. You can deselect seasons you haven’t seen or don’t remember as well.</li>
+                    <li><strong>Choose Difficulty:</strong> Select Easy (16 queens), Normal (24 queens), or Hard (32 queens).</li>
+                    <li><strong>Start/Join Game:</strong>
+                        <ul>
+                            <li><strong>Player 1:</strong> Click "Start New Game". The game will generate a board and a unique Game Seed (e.g., SHANTE123).</li>
+                            <li><strong>Share:</strong> Player 1 tells Player 2 the exact Game Seed <em>and</em> the Filters and Difficulty they used (e.g., "Seed is SHANTE123, Normal difficulty, only S5-S8 and AS2 selected").</li>
+                            <li><strong>Player 2:</strong> Selects the <em>same</em> Filters and Difficulty, enters the Game Seed into the input box, and clicks "Join with Seed". Both players should now see the identical board!</li>
+                        </ul>
+                    </li>
+                     <li><strong>Pick Your Queen:</strong> Each player clicks the "Pick My Queen" button and then selects one queen from the grid. This is your secret queen! Click the button again to return to elimination mode.</li>
+                </ul>
+
+                <h3><strong>Gameplay:</strong></h3>
+                <ul>
+                    <li>Players take turns asking yes/no questions about their opponent's secret queen (e.g., "Was your queen on an All Stars season?”, “Did they win a bottom two lip sync?”, "Is your queen perfect, beautiful, and does she look like Linda Evangelista?”).</li>
+                    <li>Based on the answer, click on the queens on your board that are eliminated by the clue. Clicked queens will be dimmed/grayed out. (Click again to undo if you make a mistake).</li>
+                    <li>Continue asking questions and eliminating queens until you think you know who their secret queen is.</li>
+                    <li>When you're ready, make a final guess on your turn! If you're right, you win. If you're wrong, you lose this round.</li>
+                 </ul>
+                 <p style="margin-top: 1.5rem; text-align: center;"><strong>Good luck, and don’t fuck it up.</strong></p>
+             `;
+             // Ensure the close button exists after setting innerHTML
+             if (!modalContent.querySelector('.modal-close-btn') && closeBtn) {
+                 modalContent.appendChild(closeBtn);
+             }
+        }
+
+        // --- Initialization & Event Listeners ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const newGameBtn = document.getElementById('new-game-btn');
+            const joinGameBtn = document.getElementById('join-game-btn');
+            const seedInput = document.getElementById('seed-input');
+            const queenGrid = document.getElementById('queen-grid');
+            const filterContainer = document.getElementById('filter-container');
+            const selectAllBtn = document.getElementById('select-all-btn');
+            const deselectAllBtn = document.getElementById('deselect-all-btn');
+            const howToPlayBtn = document.getElementById('how-to-play-btn');
+            const modalCloseBtn = document.getElementById('modal-close-btn');
+            const modal = document.getElementById('how-to-play-modal');
+            const resetBoardBtn = document.getElementById('reset-board-btn');
+            const copySeedBtn = document.getElementById('copy-seed-btn');
+            const pickQueenToggleBtn = document.getElementById('pick-queen-toggle-btn');
+
+            generateFilterButtons();
+
+            // --- Attach Event Listeners ---
+            if (newGameBtn) { newGameBtn.addEventListener('click', () => { const newSeed = generateRandomSeed(); seedInput.value = ''; setupBoard(newSeed); }); }
+            if (joinGameBtn && seedInput) { joinGameBtn.addEventListener('click', () => { const enteredSeed = seedInput.value.trim().toUpperCase(); if (enteredSeed) { setupBoard(enteredSeed); } else { const errorMessage = document.getElementById('error-message'); if(errorMessage) errorMessage.textContent = 'Please enter a seed to join.'; if(queenGrid) queenGrid.innerHTML = ''; document.getElementById('instruction-text').textContent = 'Start a new game or enter a seed to join.'; document.querySelector('#seed-display span').textContent = 'N/A'; document.getElementById('queen-count-message').textContent = ''; } }); }
+            if (queenGrid) { queenGrid.addEventListener('click', handleGridClick); }
+            if (filterContainer) { filterContainer.addEventListener('click', handleFilterClick); }
+            if (selectAllBtn) { selectAllBtn.addEventListener('click', () => setAllFilters(true)); }
+            if (deselectAllBtn) { deselectAllBtn.addEventListener('click', () => setAllFilters(false)); }
+            if (howToPlayBtn) { howToPlayBtn.addEventListener('click', openModal); }
+            if (modalCloseBtn) { modalCloseBtn.addEventListener('click', closeModal); } // Make sure this is attached
+            if (resetBoardBtn) { resetBoardBtn.addEventListener('click', resetBoard); }
+            if (copySeedBtn) { copySeedBtn.addEventListener('click', copySeedToClipboard); }
+            if (pickQueenToggleBtn) { pickQueenToggleBtn.addEventListener('click', togglePickQueenMode); }
+
+            // Add listener for closing modal by clicking outside
+            if (modal) {
+                window.addEventListener('click', (event) => {
+                    if (event.target == modal) {
+                        closeModal();
+                    }
+                });
+                 // Ensure close button inside modal works even after innerHTML changes
+                 modal.addEventListener('click', (event) => {
+                     if (event.target.matches('.modal-close-btn')) {
+                         closeModal();
+                     }
+                 });
+            }
+        });
+
+    </script>
+
+</body>
+</html>
+
